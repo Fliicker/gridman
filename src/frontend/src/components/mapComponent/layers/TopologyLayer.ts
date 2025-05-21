@@ -7,7 +7,9 @@ import NHLayerGroup from '../utils/NHLayerGroup'
 import GridCore from '../../../core/grid/NHGridCore'
 import { NHCustomLayerInterface } from '../utils/interfaces'
 import VibrantColorGenerator from '../../../core/util/vibrantColorGenerator'
-import { GridInfo, MultiGridRenderInfo } from '@/core/grid/NHGrid'
+import { GridCheckingInfo, MultiGridRenderInfo } from '@/core/grid/types'
+import store from '@/store'
+import { CheckingSwitch } from '@/context'
 
 const LEVEL_PALETTE_LENGTH = 256 // Grid level range is 0 - 255 (UInt8)
 const DEFAULT_MAX_GRID_NUM = 4096 * 4096 // 16M grids, a size that most GPUs can handle
@@ -48,6 +50,9 @@ export default class TopologyLayer implements NHCustomLayerInterface {
     private _overlayCtx: CanvasRenderingContext2D | null = null;
 
     resizeHandler: Function
+
+    checkOnEvent: Function
+    checkOffEvent: Function
 
     // GPU-related ///////////////////////////////////////////////////////
 
@@ -126,6 +131,9 @@ export default class TopologyLayer implements NHCustomLayerInterface {
             this._resizeOverlayCanvas();
         });
         resizeObserver.observe(mapContainer);
+
+        this.checkOnEvent = (() => this.executeClearSelection()).bind(this)
+        this.checkOffEvent = (() => this.executeClearSelection()).bind(this)
     }
 
     get maxGridNum(): number {
@@ -232,6 +240,11 @@ export default class TopologyLayer implements NHCustomLayerInterface {
         canvas2d.width = rect.width
         canvas2d.height = rect.height
         this._ctx = canvas2d.getContext('2d')
+
+        // Check On
+        const checkingSwitch: CheckingSwitch = store.get('checkingSwitch')!
+        checkingSwitch.addEventListener('on', this.checkOnEvent)
+        checkingSwitch.addEventListener('off', this.checkOffEvent)
     }
 
     async initGPUResource() {
@@ -543,9 +556,19 @@ export default class TopologyLayer implements NHCustomLayerInterface {
         this.endCallback()
     }
 
-    executeCheckGrid(startPos: [number, number]): GridInfo | null {
+    executeCheckGrid(startPos: [number, number]): GridCheckingInfo | null {
+        // Clear hit set
+        this.executeClearSelection()
+
+        // Get checkable grid
         const storageId = this._brushPicking(this._calcPickingMatrix(startPos))
         if (storageId < 0) return null
+
+        // Highlight grid
+        this._hit(storageId)
+        this.map.triggerRepaint()
+
+        // Check information
         return this.gridCore.checkGrid(storageId)
     }
 
@@ -989,6 +1012,11 @@ export default class TopologyLayer implements NHCustomLayerInterface {
         this.executeClearSelection()
         this.initialized = false
         this._gridCore = null
+
+        const checkingSwitch: CheckingSwitch = store.get('checkingSwitch')!
+        checkingSwitch.removeEventListener('on', this.checkOnEvent)
+        checkingSwitch.removeEventListener('off', this.checkOffEvent)
+
         this.map.triggerRepaint()
     }
 
