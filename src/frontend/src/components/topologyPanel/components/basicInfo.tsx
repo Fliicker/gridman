@@ -1,18 +1,19 @@
 import { useContext } from 'react';
-import { LanguageContext } from '../../context';
+import { LanguageContext } from '../../../context';
 import store from '@/store';
 import GridCore from '@/core/grid/NHGridCore';
 import BoundsCard from '@/components/projectPanel/components/boundsCard';
+
 export default function BasicInfo() {
     const { language } = useContext(LanguageContext);
 
     const currentProject = store.get<any>('ProjectName');
-    const currentSubproject = store.get<any>('SubprojectName');
+    const currentPatch = store.get<any>('PatchName');
     const gridCore = store.get<GridCore>('gridCore');
     const epsg = gridCore?.srcCRS.replace('EPSG:', '');
-    const subdivideRules = gridCore?.context.rules;
     const bounds = gridCore?.context.bBox.data;
     const schemaGridInfo = store.get<number[][]>('SchemaGridInfo');
+    const paletteColorList = store.get<Uint8Array>('paletteColorList');
 
     return (
         <div className="bg-blue-50 p-3 rounded-md shadow-sm">
@@ -28,12 +29,13 @@ export default function BasicInfo() {
                 </div>
                 <div>
                     <span className="font-bold">
-                        {language === 'zh' ? '子项目：' : 'Subproject: '}
+                        {language === 'zh' ? '补丁：' : 'Patch: '}
                     </span>
-                    {currentSubproject || '-'}
+                    {currentPatch || '-'}
                 </div>
                 <div>
-                    <span className="font-bold">EPSG: {epsg || '-'}</span>
+                    <span className="font-bold">EPSG: </span>
+                    {epsg || '-'}
                 </div>
                 <div className="flex items-start flex-row">
                     <div
@@ -46,11 +48,18 @@ export default function BasicInfo() {
                     >
                         {schemaGridInfo ? (
                             schemaGridInfo.map(
-                                (level: number[], index: number) => (
-                                    <div key={index} className="text-sm">
-                                        level {index + 1}: [{level.join(', ')}]
-                                    </div>
-                                )
+                                (level: number[], index: number) => {
+                                    const color = paletteColorList ?
+                                        [paletteColorList[(index+1) * 3], paletteColorList[(index+1) * 3 + 1], paletteColorList[(index+1) * 3 + 2]] :
+                                        null;
+                                    const colorStyle = color ? `rgb(${color[0]}, ${color[1]}, ${color[2]})` : undefined;
+
+                                    return (
+                                        <div key={index} className="text-sm" style={{ color: colorStyle }}>
+                                            level {index + 1}: [{level.join(', ')}]
+                                        </div>
+                                    );
+                                }
                             )
                         ) : (
                             <span>-</span>

@@ -1,16 +1,16 @@
 import React, { useContext, forwardRef } from 'react';
-import { LanguageContext } from '../../../../context';
-import { LUMDataNodeProps } from '../../types/types';
+import { LanguageContext } from '../../../context';
+import { TopologyValidationProps } from '..//types/types';
 import { AnimatedCard, CardBackground, Blob } from './nodeBackground';
 
-const LUMDataNode = forwardRef<HTMLDivElement, LUMDataNodeProps>(
+const TopologyValidation = forwardRef<HTMLDivElement, TopologyValidationProps>(
     ({ isClicked, onNodeClick, ...props }, ref) => {
         const { language } = useContext(LanguageContext);
 
-        const LUMDataNodeContent = () => (
-            <div className="w-full p-2 bg-white rounded-md  border border-gray-200">
+        const TopologyValidationContent = () => (
+            <div className="p-2 bg-white rounded-md shadow-sm border border-gray-200 w-full">
                 <h3 className="text-md ml-1 mb-1 font-bold text-center">
-                    {language === 'zh' ? '土地利用数据' : 'LUM Data'}
+                    {language === 'zh' ? '拓扑验证' : 'Topology Validation'}
                 </h3>
             </div>
         );
@@ -19,24 +19,28 @@ const LUMDataNode = forwardRef<HTMLDivElement, LUMDataNodeProps>(
             return (
                 <AnimatedCard
                     ref={ref}
-                    className="cursor-pointer w-[42%]"
+                    className="cursor-pointer w-[65%]"
                     onClick={onNodeClick}
                 >
                     <CardBackground />
                     <Blob />
                     <div className="z-20 relative rounded-md h-full p-1">
-                        <LUMDataNodeContent />
+                        <TopologyValidationContent />
                     </div>
                 </AnimatedCard>
             );
         } else {
             return (
-                <div ref={ref} onClick={onNodeClick} className="cursor-pointer w-5/12 shadow-sm rounded-md mb-2">
-                    <LUMDataNodeContent />
+                <div
+                    ref={ref}
+                    onClick={onNodeClick}
+                    className="cursor-pointer w-[62%] shadow-sm rounded-md mb-2"
+                >
+                    <TopologyValidationContent />
                 </div>
             );
         }
     }
 );
 
-export default LUMDataNode;
+export default TopologyValidation;

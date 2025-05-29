@@ -5,6 +5,7 @@ import {
 } from '../../schemaPanel/types/types';
 import { LucideIcon } from 'lucide-react';
 import { Sidebar } from '@/components/ui/sidebar';
+import { ProjectMeta, ResponseWithMultiProjectMeta } from '@/core/apis/types';
 
 export interface RectangleCoordinates {
     northEast: [number, number];
@@ -31,6 +32,7 @@ export interface CreateProjectProps {
     setGridLine?: (line: string | null) => void;
     gridLabel?: mapboxgl.Marker | null;
     setGridLabel?: (label: mapboxgl.Marker | null) => void;
+    setRectangleCoordinates: React.Dispatch<React.SetStateAction<RectangleCoordinates | null>>;
 }
 
 export interface ProjectValidationResult {
@@ -46,7 +48,7 @@ export interface ProjectErrorMessageProps {
     message: string | null;
 }
 
-export interface SubProjectErrorMessageProps {
+export interface PatchErrorMessageProps {
     message: string | null;
 }
 
@@ -56,7 +58,7 @@ export interface ProjectNameCardProps {
     hasError: boolean;
     onChange: (value: string) => void;
 }
-export interface SubProjectNameCardProps {
+export interface PatchNameCardProps {
     name: string;
     language: string;
     hasError: boolean;
@@ -81,15 +83,15 @@ export interface ProjectCardProps {
     descriptionText?: Record<string, string>;
     onEditDescription?: (name: string) => void;
     onSaveDescription?: (name: string, project: Project) => Promise<void>;
-    onAddSubproject?: (
+    onAddPatch?: (
         project: Project,
         schemaName?: string,
         epsg?: string,
         gridInfo?: string
     ) => void;
     onDeleteProject?: (project: Project) => void;
-    highlightedSubproject?: string | null;
-    onSubprojectHighlight?: (projectName: string, subprojectName: string) => void;
+    highlightedPatch?: string | null;
+    onPatchHighlight?: (projectName: string, patchName: string) => void;
 }
 
 export interface SubNavItem {
@@ -107,7 +109,7 @@ export interface ProjectSubNavPanelProps {
     onTotalItemsChange: (total: number) => void;
     onNavigateToPage: (page: number) => void;
     searchQuery?: string;
-    onCreateSubProject?: (
+    onCreatePatch?: (
         parentProject: Project,
         schemaName?: string,
         epsg?: string,
@@ -118,7 +120,7 @@ export interface ProjectSubNavPanelProps {
 export interface ProjectPanelProps
     extends React.ComponentProps<typeof Sidebar> {
     onCreateNew?: () => void;
-    onCreateSubProject?: (
+    onCreatePatch?: (
         parentProject: Project,
         schemaName?: string,
         epsg?: string,
@@ -126,7 +128,7 @@ export interface ProjectPanelProps
     ) => void;
 }
 
-export interface SubprojectData {
+export interface PatchData {
     name: string;
     bounds?: number[];
     description?: string;
@@ -134,20 +136,20 @@ export interface SubprojectData {
     [key: string]: any;
 }
 
-export interface SubProjectCardProps {
+export interface PatchCardProps {
     isHighlighted: boolean;
-    subproject: SubprojectData;
+    patch: PatchData;
     parentProjectTitle: string;
     language: string;
-    subprojectDescriptionText?: Record<string, string>;
+    patchDescriptionText?: Record<string, string>;
     onCardClick: () => void;
-    onStarToggle?: (subprojectName: string, starred: boolean) => void;
-    onEditSubprojectDescription?: (subprojectName: string) => void;
-    onSaveSubprojectDescription?: (
-        subprojectName: string,
+    onStarToggle?: (patchName: string, starred: boolean) => void;
+    onEditPatchDescription?: (patchName: string) => void;
+    onSavePatchDescription?: (
+        patchName: string,
         description: string
     ) => Promise<void>;
-    onHighlight?: (projectName: string, subprojectName: string) => void;
+    onHighlight?: (projectName: string, patchName: string) => void;
 }
 
 export interface ProjectDescriptionCardProps {
@@ -156,7 +158,7 @@ export interface ProjectDescriptionCardProps {
     hasError: boolean;
     onChange: (value: string) => void;
 }
-export interface SubProjectDescriptionCardProps {
+export interface PatchDescriptionCardProps {
     description: string;
     language: string;
     hasError: boolean;
@@ -194,7 +196,8 @@ export interface ProjectConvertedCoordCardProps {
 }
 
 export interface AdjustAndExpandRectangleParams {
-    rectangleCoordinates: RectangleCoordinates;
+    rectangleCoordinates: RectangleCoordinates ;
+    isConverted: boolean;
     epsg: string;
     gridLevel: number[];
     schemaBasePoint: [number, number];
@@ -204,4 +207,22 @@ export interface AdjustAndExpandRectangleParams {
         toEpsg: string
     ) => [number, number];
     expandFactor?: number;
+}
+
+export interface PatchBoundsProps {
+    isDrawing: boolean;
+    rectangleCoordinates: RectangleCoordinates | null;
+    onDrawRectangle: (currentlyDrawing: boolean) => void;
+}
+
+export interface UpdatedPatchBoundsProps extends PatchBoundsProps {
+    convertedRectangle: RectangleCoordinates | null;
+    setConvertedRectangle: (rect: RectangleCoordinates) => void;
+    onAdjustAndDraw: (north: string, south: string, east: string, west: string) => void;
+    drawExpandedRectangleOnMap?: () => void;
+}
+
+export interface MultiProjectMeta extends ResponseWithMultiProjectMeta {
+    total_count: number
+    project_metas: ProjectMeta[] | null
 }

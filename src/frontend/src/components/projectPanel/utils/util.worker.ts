@@ -1,498 +1,265 @@
-import { Callback, WorkerSelf } from '../../../core/types'
-import GridManager from '../../../core/grid/NHGridManager';
-import { MultiGridRenderInfo, GridContext, MultiGridInfoParser, MultiGridBaseInfo } from '../../../core/grid/types'
+import * as api from '@/core/apis/apis'
+import { MultiProjectMeta } from '../types/types'
+import { Callback, WorkerSelf } from '@/core/types'
 
-const DELETED_FLAG = 1
-const UNDELETED_FLAG = 0
-
-type ReturnType = {
-    err: Error | null;
-    result: any;
-};
-
-type AsyncReturnType = Promise<ReturnType>;
-
-export default class ProjectUtils {
-    static async setSubproject(
-        projectName: string,
-        subprojectName: string
-    ): AsyncReturnType {
-        const setAPI = `/api/grid/subproject/${projectName}/${subprojectName}`;
-        const pollAPI = `/api/grid/subproject`;
-        const metaAPI = `/api/grid/operation/meta`;
-
-        // Step 1: Set current subproject
-        const response = await fetch(setAPI, { method: 'GET' });
-        if (!response.ok) {
-            return {
-                err: new Error(`获取子项目失败! 状态码: ${response.status}`),
-                result: null,
-            };
-        }
-        // Get setting result
-        const responseData = await response.json();
-        if (!responseData.success)
-            return {
-                err: new Error(
-                    `设置子项目失败! 状态码: ${responseData.message}`
-                ),
-                result: null,
-            };
-
-        // Step 2: Poll until subproject is ready
-        while (true) {
-            const response = await fetch(pollAPI, { method: 'GET' });
-            const isReady = (await response.json()).is_ready;
-            if (isReady) break;
-            setTimeout(() => {}, 1000);
-        }
-
-
-
-        // Step 3: Get subproject info
-        const metaResponse = await fetch(metaAPI, { method: 'GET' });
-        if (!metaResponse.ok) {
-            return {
-                err: new Error(`获取子项目失败! 状态码: ${response.status}`),
-                result: null,
-            };
-        }
-        const metaResponseData = await metaResponse.json();
-        return {
-            err: null,
-            result: metaResponseData,
-        };
-    }
-
-    static async updateSubprojectDescription(
-        projectName: string,
-        subprojectName: string,
-        description: string
-    ): AsyncReturnType {
-        const listAPI = `/api/grid/subprojects/${projectName}`;
-        const updateAPI = `/api/grid/subproject/${projectName}/${subprojectName}`;
-
-        // Step 1: Get subproject list
-        const listResponse = await fetch(listAPI);
-        if (!listResponse.ok)
-            return {
-                err: new Error(
-                    `获取子项目列表失败! 状态码: ${listResponse.status}`
-                ),
-                result: null,
-            };
-
-        // Update subproject description
-        const listData = await listResponse.json();
-        const subprojectToUpdate = listData.subproject_metas.find(
-            (subproject: any) => subproject.name === subprojectName
-        );
-        if (!subprojectToUpdate)
-            return {
-                err: new Error(`找不到名为 ${subprojectName} 的子项目`),
-                result: null,
-            };
-
-        const updatedSubproject = { ...subprojectToUpdate, description };
-
-        // Step 2: Update subproject description
-        const putResponse = await fetch(updateAPI, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(updatedSubproject),
-        });
-
-        if (!putResponse.ok)
-            return {
-                err: new Error(
-                    `更新子项目描述失败! 状态码: ${putResponse.status}`
-                ),
-                result: null,
-            };
-
-        const responseData = await putResponse.json();
-        return {
-            err: null,
-            result: responseData,
-        };
-    }
-
-    static async updateSubprojectStarred(
-        projectName: string,
-        subprojectName: string,
-        starred: boolean
-    ): AsyncReturnType {
-        const listAPI = `/api/grid/subprojects/${projectName}`;
-        const updateAPI = `/api/grid/subproject/${projectName}/${subprojectName}`;
-
-        // Step 1: Get subproject list
-        const listResponse = await fetch(listAPI);
-        if (!listResponse.ok)
-            return {
-                err: new Error(
-                    `获取子项目列表失败! 状态码: ${listResponse.status}`
-                ),
-                result: null,
-            };
-
-        // Update subproject starred status
-        const listData = await listResponse.json();
-        const subprojectToUpdate = listData.subproject_metas.find(
-            (subproject: any) => subproject.name === subprojectName
-        );
-        if (!subprojectToUpdate)
-            return {
-                err: new Error(`找不到名为 ${subprojectName} 的子项目`),
-                result: null,
-            };
-        const updatedSubproject = { ...subprojectToUpdate, starred };
-
-        // Step 2: Update subproject starred status
-        const putResponse = await fetch(updateAPI, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(updatedSubproject),
-        });
-        if (!putResponse.ok) {
-            throw new Error(
-                `更新子项目星标状态失败! 状态码: ${putResponse.status}`
-            );
-        }
-
-        const responseData = await putResponse.json();
-        return {
-            err: null,
-            result: responseData,
-        };
-    }
-
-    static async fetchSubprojects(projectName: string): AsyncReturnType {
-        const response = await fetch(`/api/grid/subprojects/${projectName}`);
-        if (!response.ok) {
-            throw new Error(`获取子项目列表失败! 状态码: ${response.status}`);
-        }
-
-        const responseData = await response.json();
-        return {
-            err: null,
-            result: responseData,
-        };
-    }
-
-    static async createSubProject(SubprojectData: any): AsyncReturnType {
-        const { projectName, ...subprojectData } = SubprojectData;
-        const createAPI = `/api/grid/subproject/${projectName}`;
-        const response = await fetch(createAPI, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(subprojectData),
-        });
-        if (!response.ok)
-            return {
-                err: new Error(`HTTP错误! 状态码: ${response.status}`),
-                result: null,
-            };
-
-        const responseData = await response.json();
-        return {
-            err: null,
-            result: responseData,
-        };
-    }
-
-    static async getSubprojects(
-        projectName: string,
-        subprojectName: string
-    ): AsyncReturnType {
-        const getAPI = `/api/grid/subproject/${projectName}/${subprojectName}`;
-        const response = await fetch(getAPI);
-        if (!response.ok)
-            return {
-                err: new Error(`获取子项目失败! 状态码: ${response.status}`),
-                result: null,
-            };
-
-        const responseData = await response.json();
-        return {
-            err: null,
-            result: responseData,
-        };
-    }
-
-    static async deleteProject(projectName: string): AsyncReturnType {
-        const deleteAPI = `/api/grid/project/${projectName}`;
-        const response = await fetch(deleteAPI, { method: 'DELETE' });
-        if (!response.ok) {
-            return {
-                err: new Error(`删除模板失败! 状态码: ${response.status}`),
-                result: null,
-            };
-        }
-
-        const responseData = await response.json();
-        return {
-            err: null,
-            result: responseData,
-        };
-    }
-
-    static async createProject(projectData: any): AsyncReturnType {
-        const createAPI = `/api/grid/project`;
-        const response = await fetch(createAPI, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(projectData),
-        });
-        if (!response.ok) {
-            return {
-                err: new Error(`创建项目失败! 状态码: ${response.status}`),
-                result: null,
-            };
-        }
-
-        const responseData = await response.json();
-        return {
-            err: null,
-            result: responseData,
-        };
-    }
-
-    static async updateProjectDescription(
-        projectName: string,
-        description: string
-    ): AsyncReturnType {
-        const getAPI = `/api/grid/project/${projectName}`;
-        const updateAPI = `/api/grid/project/${projectName}`;
-
-        // Step 1: Get project
-        const response = await fetch(getAPI);
-        if (!response.ok) {
-            return {
-                err: new Error(`获取项目失败! 状态码: ${response.status}`),
-                result: null,
-            };
-        }
-
-        // Update project description
-        const responseData = await response.json();
-        let projectData;
-        if (responseData.project_meta) {
-            projectData = { ...responseData.project_meta };
-        } else {
-            projectData = { ...responseData };
-        }
-        projectData.description = description;
-
-        // Step 2: Update project description
-        const putResponse = await fetch(updateAPI, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(projectData),
-        });
-        if (!putResponse.ok) {
-            return {
-                err: new Error(
-                    `更新项目描述失败! 状态码: ${putResponse.status}`
-                ),
-                result: null,
-            };
-        }
-
-        const updatedData = await putResponse.json();
-        return {
-            err: null,
-            result: updatedData,
-        };
-    }
-
-    static async updateProjectStarred(
-        projectName: string,
-        starred: boolean
-    ): AsyncReturnType {
-        const getAPI = `/api/grid/project/${projectName}`;
-        const updateAPI = `/api/grid/project/${projectName}`;
-
-        // Step 1: Get project
-        const response = await fetch(getAPI);
-        if (!response.ok) {
-            return {
-                err: new Error(`获取项目失败! 状态码: ${response.status}`),
-                result: null,
-            };
-        }
-
-        // Update project starred status
-        const responseData = await response.json();
-        let projectData;
-        if (responseData.project_meta) {
-            projectData = { ...responseData.project_meta };
-        } else {
-            projectData = { ...responseData };
-        }
-        projectData.starred = starred;
-
-        // Step 2: Update project starred status
-        const putResponse = await fetch(updateAPI, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(projectData),
-        });
-        if (!putResponse.ok) {
-            return {
-                err: new Error(
-                    `更新项目星标状态失败! 状态码: ${putResponse.status}`
-                ),
-                result: null,
-            };
-        }
-
-        const updatedData = await putResponse.json();
-        return {
-            err: null,
-            result: updatedData,
-        };
-    }
-
-    static async getProjectByName(projectName: string): AsyncReturnType {
-        const getAPI = `/api/grid/project/${projectName}`;
-        const response = await fetch(getAPI);
-        if (!response.ok) {
-            return {
-                err: new Error(`获取项目失败! 状态码: ${response.status}`),
-                result: null,
-            };
-        }
-
-        const responseData = await response.json();
-        return {
-            err: null,
-            result: responseData,
-        };
-    }
-
-    static async fetchProjects(
-        startIndex: number,
-        endIndex: number
-    ): AsyncReturnType {
-        const getAPI = `/api/grid/projects/?startIndex=${startIndex}&endIndex=${endIndex}`;
-        const numAPI = `/api/grid/projects/num`;
-
-        // Step 1: Get projects
-        const response = await fetch(getAPI);
-        if (!response.ok) {
-            return {
-                err: new Error(`获取项目列表失败! 状态码: ${response.status}`),
-                result: null,
-            };
-        }
-
-        const responseData = await response.json();
-
-        // Step 2: Get number of projects
-        const numResponse = await fetch(numAPI);
-        if (numResponse.ok) {
-            const countText = await numResponse.text();
-            const countData = JSON.parse(countText);
-            if (typeof countData.count === 'number') {
-                responseData.total_count = countData.count;
-            } else if (typeof countData === 'number') {
-                responseData.total_count = countData;
-            } else if (countData && typeof countData.total === 'number') {
-                responseData.total_count = countData.total;
-            } else {
-                const possibleCountFields = Object.entries(countData).find(
-                    ([key, value]) =>
-                        typeof value === 'number' &&
-                        (key.includes('count') ||
-                            key.includes('total') ||
-                            key.includes('num'))
-                );
-                if (possibleCountFields) {
-                    responseData.total_count = possibleCountFields[1] as number;
-                } else {
-                    const numericValue = parseInt(countText.trim(), 10);
-                    if (!isNaN(numericValue)) {
-                        responseData.total_count = numericValue;
-                    } else {
-                        responseData.total_count =
-                            responseData.project_metas.length;
-                    }
-                }
-            }
-        } else {
-            responseData.total_count = responseData.project_metas.length;
-        }
-        if (responseData.total_count < responseData.project_metas.length) {
-            responseData.total_count = responseData.project_metas.length;
-        }
-
-        return {
-            err: null,
-            result: responseData,
-        };
-    }
-
-    static setGridManager(
-        worker: WorkerSelf & Record<'gridManager', GridManager>,
-        context: GridContext
-    ) {
-        worker.gridManager = new GridManager(context);
-    }
-
-    static async getGridInfo(
-        worker: WorkerSelf & Record<'gridManager', GridManager>
-    ): Promise<MultiGridBaseInfo> {
-        const activateInfoAPI = '/api/grid/operation/activate-info'
-        const deletedInfoAPI = '/api/grid/operation/deleted-info'
-        const [activateInfoResponse, deletedInfoResponse] = await Promise.all([
-            MultiGridInfoParser.fromGetUrl(activateInfoAPI),
-            MultiGridInfoParser.fromGetUrl(deletedInfoAPI)
-        ]);
-
-        // Create combined levels for activate and deleted grids
-        const combinedLevels = new Uint8Array(activateInfoResponse.levels.length + deletedInfoResponse.levels.length);
-        combinedLevels.set(activateInfoResponse.levels, 0);
-        combinedLevels.set(deletedInfoResponse.levels, activateInfoResponse.levels.length);
-
-        // // Create combined global IDs for activate and deleted grids
-        const combinedGlobalIds = new Uint32Array(activateInfoResponse.globalIds.length + deletedInfoResponse.globalIds.length);
-        combinedGlobalIds.set(activateInfoResponse.globalIds, 0);
-        combinedGlobalIds.set(deletedInfoResponse.globalIds, activateInfoResponse.globalIds.length);
+export async function fetchProjects(
+    this: WorkerSelf,
+    params: { startIndex: number; endIndex: number },
+    callback: Callback<any>
+) {
+    const { startIndex, endIndex } = params
+    try {
+        // Step 1: Get number of projects
+        const numResponse = (await api.grid.projects.getProjectsNum.fetch()).number
         
-        // // Create combined vertices for activate and deleted grids
-        // const combinedVertices = worker.gridManager.createMultiGridRenderVertices(combinedLevels, combinedGlobalIds);
+        // Step 2: Get multi-project meta
+        const response = await api.grid.projects.getMultiProjectMeta.fetch({ startIndex, endIndex })
 
-        // // Create a combined deleted flags array
-        const combinedDeleted = new Uint8Array(combinedLevels.length);
-        combinedDeleted.fill(UNDELETED_FLAG, 0, activateInfoResponse.levels.length);
-        combinedDeleted.fill(DELETED_FLAG, activateInfoResponse.levels.length);
-
-        return {
-            levels: combinedLevels,
-            globalIds: combinedGlobalIds,
-            deleted: combinedDeleted,
-        }
-
-        // return {
-        //     levels: combinedLevels,
-        //     globalIds: combinedGlobalIds,
-        //     vertices: combinedVertices[0],
-        //     verticesLow: combinedVertices[1],
-        //     deleted: combinedDeleted,
-        // }
+        callback(
+            null,
+            {
+                project_metas: response.project_metas,
+                total_count: numResponse,
+            } as MultiProjectMeta
+        )
+    } catch (error) {
+        callback(new Error(`获取项目列表失败! 错误信息: ${error}`), null)
     }
 }
 
+export async function getProjectByName(
+    this: WorkerSelf,
+    projectName: string,
+    callback: Callback<any>
+) {
+    try {
+        const response = await api.grid.project.getProject.fetch(projectName)
+        if (response.project_meta === null || response.project_meta === undefined) {
+            throw new Error(
+                `项目 ${projectName} 不存在或未找到`
+            )
+        }
+        callback(null, response)
+    } catch (error) {
+        callback(new Error(`获取项目失败! 错误信息: ${error}`), null)
+    }
+}
 
+export async function updateProjectStarred(
+    this: WorkerSelf,
+    params: { name: string; starred: boolean },
+    callback: Callback<any>
+) {
+    const { name: projectName, starred } = params;
+    try {
+        // Step 1: Get project
+        const projectMeta = (await api.grid.project.getProject.fetch(projectName)).project_meta
+        if (!projectMeta) {
+            throw new Error(`项目 ${projectName} 不存在或未找到`)
+        }
+
+        // Step 2: Update project starred status
+        projectMeta.starred = starred
+
+        // Step 3: Update project
+        const response = await api.grid.project.updateProject.fetch({
+            projectName,
+            projectMeta,
+        })
+        callback(null, response)
+
+    } catch (error) {
+        callback(new Error(`更新项目星标状态失败! 错误信息: ${error}`), null)
+    }
+}
+
+export async function updateProjectDescription(
+    this: WorkerSelf,
+    params: { name: string; description: string },
+    callback: Callback<any>
+) {
+    const { name: projectName, description } = params;
+    try {
+        // Step 1: Get project
+        const projectMeta = (await api.grid.project.getProject.fetch(projectName)).project_meta
+        if (!projectMeta) {
+            throw new Error(`项目 ${projectName} 不存在或未找到`)
+        }
+
+        // Step 2: Update project description
+        projectMeta.description = description
+
+        // Step 3: Update project
+        const response = await api.grid.project.updateProject.fetch({
+            projectName,
+            projectMeta,
+        })
+        callback(null, response)
+
+    } catch (error) {
+        callback(new Error(`更新项目描述失败! 错误信息: ${error}`), null)
+    }
+}
+
+export async function createProject(
+    this: WorkerSelf,
+    projectData: any,
+    callback: Callback<any>
+) {
+    try {
+        const response = await api.grid.project.createProject.fetch(projectData)
+        callback(null, response)
+
+    } catch (error) {
+        callback(new Error(`创建项目失败! 错误信息: ${error}`), null)
+    }
+}
+
+export async function deleteProject(
+    this: WorkerSelf,
+    projectName: string,
+    callback: Callback<any>
+) {
+    try {
+        const response = await api.grid.project.deleteProject.fetch(projectName)
+        callback(null, response)
+
+    } catch (error) {
+        callback(new Error(`删除项目失败! 错误信息: ${error}`), null)
+    }
+}
+
+export async function fetchPatches(
+    this: WorkerSelf,
+    params: { projectName: string },
+    callback: Callback<any>
+) {
+    const { projectName } = params
+    try {
+        const multiPatchMeta = await api.grid.patches.getMultiPatchMeta.fetch(projectName)
+        if (!multiPatchMeta.patch_metas) {
+            callback(new Error(`补丁列表为空`), null)
+        }
+        
+        callback(null, multiPatchMeta)
+
+    } catch (error) {
+        callback(new Error(`获取补丁列表失败! 错误信息: ${error}`), null)
+    }
+}
+
+export async function createPatch(
+    this: WorkerSelf,
+    PatchData: any,
+    callback: Callback<any>
+) {
+    try {
+        const response = await api.grid.patch.createPatch.fetch(PatchData)
+        callback(null, response)
+
+    } catch (error) {
+        callback(new Error(`创建补丁失败! 错误信息: ${error}`), null)
+    }
+}
+
+export async function updatePatchStarred(
+    this: WorkerSelf,
+    params: { projectName: string; patchName: string; starred: boolean },
+    callback: Callback<any>
+) {
+    const { projectName, patchName, starred } = params
+    try {
+        // Step 1: Get patch list
+        const multiPatchMeta = await api.grid.patches.getMultiPatchMeta.fetch(projectName)
+
+        // Step 2: Find the patch to update
+        if (!multiPatchMeta.patch_metas) {
+            throw new Error(
+                `补丁列表为空`
+            )
+        }
+        const patchToUpdate = multiPatchMeta.patch_metas.find(
+            patch => patch.name === patchName
+        )
+        if (!patchToUpdate) {
+            throw new Error(`找不到名为 ${patchName} 的补丁`)
+        }
+
+        // Step 2: Update patch starred status
+        patchToUpdate.starred = starred
+        const response = await api.grid.patch.updatePatch.fetch({
+            projectName,
+            patchName,
+            meta: patchToUpdate,
+        })
+        callback(null, response)
+
+    } catch (error) {
+        callback(new Error(`更新补丁星标状态失败! 错误信息: ${error}`), null)
+    }
+}
+
+export async function updatePatchDescription(
+    this: WorkerSelf,
+    params: { projectName: string; patchName: string; description: string },
+    callback: Callback<any>
+) {
+    const { projectName, patchName, description } = params
+    try {
+        // Step 1: Get patch list
+        const multiPatchMeta = await api.grid.patches.getMultiPatchMeta.fetch(projectName)
+
+        // Step 2: Find the patch to update
+        if (!multiPatchMeta.patch_metas) {
+            throw new Error(
+                `补丁列表为空`
+            )
+        }
+        const patchToUpdate = multiPatchMeta.patch_metas.find(
+            patch => patch.name === patchName
+        )
+        if (!patchToUpdate) {
+            throw new Error(`找不到名为 ${patchName} 的补丁`)
+        }
+
+        // Step 2: Update patch description
+        patchToUpdate.description = description
+        const response = await api.grid.patch.updatePatch.fetch({
+            projectName,
+            patchName,
+            meta: patchToUpdate,
+        })
+        callback(null, response)
+
+    } catch (error) {
+        callback(new Error(`更新补丁描述失败! 错误信息: ${error}`), null)
+    }
+}
+
+export async function setPatch(
+    this: WorkerSelf,
+    {
+        projectName,
+        patchName,
+    }: { projectName: string; patchName: string },
+    callback: Callback<any>
+) {
+    try {
+        // Step 1: Set current patch
+        await api.grid.patch.setCurrentPatch.fetch({ projectName, patchName })
+
+        // Step 2: Poll until patch is ready
+        while (true) {
+            const isReady = await api.grid.patch.isPatchReady.fetch()
+            if (isReady) break
+            setTimeout(() => {}, 1000)
+        }
+
+        // Step 3: Get patch info
+        const patchMeta = await api.grid.operation.getGridMeta.fetch()
+        callback(null, patchMeta)
+
+    } catch (error) {
+        callback(new Error(`设置补丁失败! 错误信息: ${error}`), null)
+    }
+}

@@ -51,9 +51,9 @@ export function Navbar({
     const navItems = [
         { labelZh: '首页', labelEn: 'Home', type: 'home', icon: Home },
         {
-            labelZh: '网格',
-            labelEn: 'Grid',
-            type: 'grid',
+            labelZh: '聚合',
+            labelEn: 'Aggregation',
+            type: 'aggregation',
             icon: LandPlot,
         },
         {
@@ -224,6 +224,8 @@ export function Navbar({
                             </Label>
                         </div>
                     </div>
+
+                    {/* OpenGMS Logo */}
                     <div className="flex items-center mr-6">
                         <a
                             href="http://geomodeling.njnu.edu.cn/"

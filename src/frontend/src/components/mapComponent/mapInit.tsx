@@ -25,11 +25,11 @@ import { convertCoordinate } from '../../core/util/coordinateUtils';
 import { generateRandomHexColor } from '../../utils/colorUtils';
 import { ProjectService } from '../projectPanel/utils/ProjectService';
 import { LanguageContext, CheckingSwitch } from '../../context';
-import { SubprojectBoundsManager } from './layers/subprojectBoundsManager';
+import { PatchBoundsManager } from './layers/patchBoundsManager';
 import store from '../../store';
 import TopologyLayer from './layers/TopologyLayer';
 import NHLayerGroup from './utils/NHLayerGroup';
-import { useSidebar } from '../ui/sidebar';
+
 // Add mapInstance property to window object
 declare global {
     interface Window {
@@ -38,11 +38,13 @@ declare global {
     }
 }
 
+// GPULayer canvas state
+const GPULayerON = false
+
 const scene: ThreejsSceneLayer | null = null;
 let rectangleLayer: GLMapRectangleLayer | null = null;
 let customRectangleDraw: CustomRectangleDraw | null = null;
 let projectBoundsLayer: ProjectBoundsLayer | null = null;
-// let subprojectBoundsManager: SubprojectBoundsManager | null = null; // Comment out or remove global instance if ref is used exclusively
 
 // Simple debounce function (you can replace this with a library version if preferred)
 const debounce = (func: (...args: any[]) => void, delay: number) => {
@@ -69,7 +71,7 @@ const MapInit: ForwardRefRenderFunction<MapInitHandle, MapInitProps> = (
     const [map, setMap] = useState<mapboxgl.Map | null>(null);
     const [draw, setDraw] = useState<MapboxDraw | null>(null);
     const mapWrapperRef = useRef<HTMLDivElement>(null);
-    const subprojectBoundsManagerRef = useRef<SubprojectBoundsManager | null>(
+    const patchBoundsManagerRef = useRef<PatchBoundsManager | null>(
         null
     );
     const [isDrawMode, setIsDrawMode] = useState(false);
@@ -253,11 +255,10 @@ const MapInit: ForwardRefRenderFunction<MapInitHandle, MapInitProps> = (
             window.mapboxDrawInstance = drawInstance;
 
             mapInstance.on('load', () => {
-                // Initialize SubprojectBoundsManager via ref, using the language from context
                 if (mapInstance) {
                     // Ensure mapInstance is valid
-                    subprojectBoundsManagerRef.current =
-                        new SubprojectBoundsManager(mapInstance, language);
+                    patchBoundsManagerRef.current =
+                        new PatchBoundsManager(mapInstance, language);
                 }
 
                 const customLayer = CustomLayer({
@@ -331,15 +332,18 @@ const MapInit: ForwardRefRenderFunction<MapInitHandle, MapInitProps> = (
                     localMouseDownPos.current = [x, y];
 
                     if (store.get<CheckingSwitch>('checkingSwitch')!.isOn) {
-                        store.set('GridInfo', topologyLayer.executeCheckGrid([x, y])),
-                        store.get<{ on: Function}>('changeGridInfo')!.on()
-                        
+                        store.set(
+                            'GridInfo',
+                            topologyLayer.executeCheckGrid([x, y])
+                        ),
+                            store.get<{ on: Function }>('changeGridInfo')!.on();
                     }
                 };
 
                 const onMouseMove = (e: MouseEvent) => {
                     if (!e.shiftKey || !localIsMouseDown.current) return;
-                    if (store.get<CheckingSwitch>('checkingSwitch')!.isOn) return;
+                    if (store.get<CheckingSwitch>('checkingSwitch')!.isOn)
+                        return;
                     const rect = canvas.getBoundingClientRect();
                     const x = e.clientX - rect.left;
                     const y = e.clientY - rect.top;
@@ -386,7 +390,8 @@ const MapInit: ForwardRefRenderFunction<MapInitHandle, MapInitProps> = (
                         }
                     }
                     if (!e.shiftKey) return;
-                    if (store.get<CheckingSwitch>('checkingSwitch')!.isOn) return;
+                    if (store.get<CheckingSwitch>('checkingSwitch')!.isOn)
+                        return;
 
                     const rect = canvas.getBoundingClientRect();
                     const x = e.clientX - rect.left;
@@ -405,7 +410,8 @@ const MapInit: ForwardRefRenderFunction<MapInitHandle, MapInitProps> = (
                 };
 
                 const onMouseOut = (e: MouseEvent) => {
-                    if (store.get<CheckingSwitch>('checkingSwitch')!.isOn) return;
+                    if (store.get<CheckingSwitch>('checkingSwitch')!.isOn)
+                        return;
                     if (mapInstance) {
                         mapInstance.dragPan.enable();
                         mapInstance.scrollZoom.enable();
@@ -415,7 +421,7 @@ const MapInit: ForwardRefRenderFunction<MapInitHandle, MapInitProps> = (
                         }
                     }
                     if (!e.shiftKey) return;
-                    
+
                     isMouseDown = false;
                     const rect = canvas.getBoundingClientRect();
                     const x = e.clientX - rect.left;
@@ -495,7 +501,7 @@ const MapInit: ForwardRefRenderFunction<MapInitHandle, MapInitProps> = (
             window.mapboxDrawInstance = undefined;
             setMap(null);
             setDraw(null);
-            subprojectBoundsManagerRef.current = null; // Clean up the ref
+            patchBoundsManagerRef.current = null; // Clean up the ref
         };
     }, [
         language,
@@ -562,37 +568,37 @@ const MapInit: ForwardRefRenderFunction<MapInitHandle, MapInitProps> = (
         }
     };
 
-    const flyToSubprojectBounds = async (
+    const flyToPatchBounds = async (
         projectName: string,
-        subprojectName: string
+        patchName: string
     ) => {
-        if (!map || !subprojectBoundsManagerRef.current) return;
-        await subprojectBoundsManagerRef.current.flyToSubprojectBounds(
+        if (!map || !patchBoundsManagerRef.current) return;
+        await patchBoundsManagerRef.current.flyToPatchBounds(
             projectName,
-            subprojectName
+            patchName
         );
     };
 
-    const highlightSubproject = (
+    const highlightPatch = (
         projectName: string,
-        subprojectName: string
+        patchName: string
     ) => {
-        if (!map || !subprojectBoundsManagerRef.current) return;
-        subprojectBoundsManagerRef.current.highlightSubproject(
+        if (!map || !patchBoundsManagerRef.current) return;
+        patchBoundsManagerRef.current.highlightPatch(
             projectName,
-            subprojectName
+            patchName
         );
     };
 
-    const showSubprojectBounds = (
+    const showPatchBounds = (
         projectName: string,
-        subprojects: any[],
+        patches: any[],
         show: boolean
     ) => {
-        if (!map || !subprojectBoundsManagerRef.current) return;
-        subprojectBoundsManagerRef.current.showSubprojectBounds(
+        if (!map || !patchBoundsManagerRef.current) return;
+        patchBoundsManagerRef.current.showPatchBounds(
             projectName,
-            subprojects,
+            patches,
             show
         );
     };
@@ -602,21 +608,27 @@ const MapInit: ForwardRefRenderFunction<MapInitHandle, MapInitProps> = (
         () => ({
             startDrawRectangle,
             startPointSelection,
-            flyToSubprojectBounds,
-            highlightSubproject,
-            showSubprojectBounds,
+            flyToPatchBounds,
+            highlightPatch,
+            showPatchBounds,
         }),
         [
             startDrawRectangle,
             startPointSelection,
-            flyToSubprojectBounds,
-            highlightSubproject,
-            showSubprojectBounds,
+            flyToPatchBounds,
+            highlightPatch,
+            showPatchBounds,
         ]
     );
 
     return (
         <div className="relative w-full h-full" ref={mapWrapperRef}>
+            { GPULayerON && (
+                <canvas
+                    id="GPULayer"
+                    className="absolute bg-red-500 opacity-20 inset-0 w-full h-full pointer-events-none z-20"
+                ></canvas>
+            )}
             <div
                 id="control-panel-container"
                 className="absolute top-0 left-0 z-10 flex flex-row items-start"

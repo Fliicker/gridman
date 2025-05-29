@@ -9,6 +9,7 @@ import store from '../../../store';
 import { MultiGridRenderInfo } from '@/core/grid/types';
 import TopologyLayer from '@/components/mapComponent/layers/TopologyLayer';
 import NHLayerGroup from '@/components/mapComponent/utils/NHLayerGroup';
+import { PatchMeta } from '@/core/apis/types';
 
 export class ProjectService {
     private language: string;
@@ -24,25 +25,19 @@ export class ProjectService {
     }
 
     public fetchAllProjects(
-        startIndex: number,
-        endIndex: number,
         callback?: Callback<any>
     ) {
         this._actor.send(
             'fetchProjects',
-            { startIndex: startIndex, endIndex: endIndex },
+            { startIndex: 0, endIndex: 1000 },
             (err, result) => {
-                if (callback) callback(err, result);
-                const projectMetas =
-                    result && result.project_metas ? result.project_metas : [];
-
-                const sortedProjects = [...projectMetas].sort((a, b) => {
+                const sortedProjects = [...result.project_metas].sort((a, b) => {
                     if (a.starred && !b.starred) return -1;
                     if (!a.starred && b.starred) return 1;
                     return 0;
                 });
-
-                return sortedProjects;
+                
+                if (callback) callback(err, sortedProjects);
             }
         );
     }
@@ -52,25 +47,24 @@ export class ProjectService {
         itemsPerPage: number,
         callback?: Callback<any>
     ) {
-        const startIndex = (page - 1) * itemsPerPage;
-        const endIndex = startIndex + itemsPerPage;
         this._actor.send(
             'fetchProjects',
-            { startIndex, endIndex },
+            { startIndex: 0, endIndex: 1000 },
             (err, result) => {
-                if (callback) callback(err, result);
-                const projects = result.project_metas || [];
-                const totalCount = result.total_count || projects.length;
-
-                const sortedProjects = [...projects].sort((a, b) => {
+                const allSortedProjects = [...result.project_metas].sort((a, b) => {
                     if (a.starred && !b.starred) return -1;
                     if (!a.starred && b.starred) return 1;
                     return 0;
                 });
 
+                const totalCount = result.total_count || allSortedProjects.length;
+                const startIndex = (page - 1) * itemsPerPage
+                const endIndex = startIndex + itemsPerPage
+                const currentPageSchemas = allSortedProjects.slice(startIndex, endIndex)
+
                 if (callback)
                     callback(err, {
-                        projects: sortedProjects,
+                        projects: currentPageSchemas,
                         totalCount,
                     });
             }
@@ -135,23 +129,9 @@ export class ProjectService {
         });
     }
 
-    public async getSubprojects(
-        projectName: string,
-        subprojectName: string,
-        callback?: Callback<any>
-    ) {
+    public fetchPatches(projectName: string, callback?: Callback<any>) {
         this._actor.send(
-            'getSubprojects',
-            { projectName: projectName, subprojectName: subprojectName },
-            (err, result) => {
-                if (callback) callback(err, result);
-            }
-        );
-    }
-
-    public fetchSubprojects(projectName: string, callback?: Callback<any>) {
-        this._actor.send(
-            'fetchSubprojects',
+            'fetchPatches',
             { projectName: projectName },
             (err, result) => {
                 if (callback) callback(err, result);
@@ -159,26 +139,16 @@ export class ProjectService {
         );
     }
 
-    public createSubproject(
+    public createPatch(
         projectName: string,
-        subprojectData: {
-            name: string;
-            starred: boolean;
-            description: string;
-            bounds: [
-                number | null,
-                number | null,
-                number | null,
-                number | null
-            ];
-        },
+        patchData: PatchMeta,
         callback?: Callback<any>
     ) {
         this._actor.send(
-            'createSubProject',
+            'createPatch',
             {
                 projectName: projectName,
-                ...subprojectData,
+                patchMeta: patchData,
             },
             (err, result) => {
                 if (callback) callback(err, result);
@@ -186,17 +156,17 @@ export class ProjectService {
         );
     }
 
-    public updateSubprojectStarred(
+    public updatePatchStarred(
         projectName: string,
-        subprojectName: string,
+        patchName: string,
         starred: boolean,
         callback?: Callback<any>
     ) {
         this._actor.send(
-            'updateSubprojectStarred',
+            'updatePatchStarred',
             {
                 projectName: projectName,
-                subprojectName: subprojectName,
+                patchName: patchName,
                 starred: starred,
             },
             (err, result) => {
@@ -205,17 +175,17 @@ export class ProjectService {
         );
     }
 
-    public updateSubprojectDescription(
+    public updatePatchDescription(
         projectName: string,
-        subprojectName: string,
+        patchName: string,
         description: string,
         callback?: Callback<any>
     ) {
         this._actor.send(
-            'updateSubprojectDescription',
+            'updatePatchDescription',
             {
                 projectName,
-                subprojectName,
+                patchName,
                 description,
             },
             (err, result) => {
@@ -224,21 +194,21 @@ export class ProjectService {
         );
     }
 
-    public setSubproject(
+    public setPatch(
         projectName: string,
-        subprojectName: string,
+        patchName: string,
         callback?: Callback<any>
     ) {
         this._actor.send(
-            'setSubproject',
+            'setPatch',
             {
                 projectName: projectName,
-                subprojectName: subprojectName,
+                patchName: patchName,
             },
 
             (error, result) => {
                 if (error) {
-                    console.error('设置子项目失败:', error);
+                    console.error('设置补丁失败:', error);
                 } else {
                     // Get topology layer
                     const clg = store.get<NHLayerGroup>('clg')!;

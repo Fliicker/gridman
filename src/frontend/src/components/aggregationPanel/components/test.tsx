@@ -2,17 +2,17 @@
 
 import { useContext, useEffect, useRef, useState } from 'react';
 import { LanguageContext } from '../../../context';
-import type { AttributePanelProps } from '../types/types';
+import type { TestProps } from '../types/types';
 import store from '@/store';
 import type NHLayerGroup from '@/components/mapComponent/utils/NHLayerGroup';
-import LUMDataNode from './components/LUMDataNode';
-import TerrainDataNode from './components/TerrainDataNode';
-import TopologyValidation from './components/TopologyValidation';
+import LUMDataNode from './LUMDataNode';
+import TerrainDataNode from './TerrainDataNode';
+import TopologyValidation from './TopologyValidation';
 import {
     AnimatedCardNoShadow,
     CardBackground,
     Blob,
-} from './components/nodeBackground';
+} from './nodeBackground';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Upload, File, AlertTriangle } from 'lucide-react';
@@ -27,7 +27,7 @@ interface Line {
 
 type ActiveNode = 'TOPOLOGY' | 'LUM' | 'TERRAIN' | null;
 
-export default function AttributePanel({}: AttributePanelProps) {
+export default function Test({}: TestProps) {
     const { language } = useContext(LanguageContext);
     const [activeNodeKey, setActiveNodeKey] = useState<ActiveNode>(null);
 
